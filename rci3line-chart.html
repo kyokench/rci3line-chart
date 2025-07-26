@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>リアル為替RCIチャート</title>
+  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #chart, #rci-chart {
+      width: 100%;
+      height: 300px;
+    }
+    h2 { padding: 1rem; background: #eee; margin: 0; }
+  </style>
+</head>
+<body>
+
+<h2>USD/JPY チャート（RCI 9, 26, 52付き）</h2>
+<div id="chart"></div>
+<div id="rci-chart"></div>
+
+<script>
+  const API_KEY = 'demo'; // ← 必ず自分のAPIキーに置き換えてください
+  const SYMBOL = 'USD/JPY';
+  const INTERVAL = '1day';
+
+  async function fetchForexData() {
+    const url = `https://api.twelvedata.com/time_series?symbol=${SYMBOL}&interval=${INTERVAL}&apikey=${API_KEY}&outputsize=100`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.values) {
+      alert("データ取得エラー：" + JSON.stringify(data));
+      return [];
+    }
+
+    // 新→旧なので反転
+    const sorted = data.values.reverse();
+
+    return sorted.map(item => ({
+      time: Math.floor(new Date(item.datetime).getTime() / 1000),
+      value: parseFloat(item.close)
+    }));
+  }
+
+  function calculateRCI(data, period) {
+    const rci = [];
+
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) {
+        rci.push({ time: data[i].time, value: null });
+        continue;
+      }
+
+      const slice = data.slice(i - period + 1, i + 1);
+      const timeRanks = Array.from({ length: period }, (_, i) => i + 1);
+      const priceRanks = [...slice]
+        .map((d, idx) => ({ idx, value: d.value }))
+        .sort((a, b) => b.value - a.value)
+        .map((d, i) => ({ ...d, rank: i + 1 }))
+        .sort((a, b) => a.idx - b.idx)
+        .map(d => d.rank);
+
+      let sumD2 = 0;
+      for (let j = 0; j < period; j++) {
+        const d = timeRanks[j] - priceRanks[j];
+        sumD2 += d * d;
+      }
+
+      const rciValue = (1 - (6 * sumD2) / (period * (period * period - 1))) * 100;
+      rci.push({ time: data[i].time, value: rciValue });
+    }
+
+    return rci;
+  }
+
+  async function init() {
+    const priceData = await fetchForexData();
+
+    if (priceData.length === 0) return;
+
+    const rci9 = calculateRCI(priceData, 9);
+    const rci26 = calculateRCI(priceData, 26);
+    const rci52 = calculateRCI(priceData, 52);
+
+    const chart = LightweightCharts.createChart(document.getElementById('chart'), { height: 300 });
+    chart.addLineSeries({ color: 'black' }).setData(priceData);
+
+    const rciChart = LightweightCharts.createChart(document.getElementById('rci-chart'), { height: 300 });
+    rciChart.addLineSeries({ color: 'red', title: 'RCI9' }).setData(rci9);
+    rciChart.addLineSeries({ color: 'green', title: 'RCI26' }).setData(rci26);
+    rciChart.addLineSeries({ color: 'blue', title: 'RCI52' }).setData(rci52);
+  }
+
+  init();
+</script>
+
+</body>
+</html>
