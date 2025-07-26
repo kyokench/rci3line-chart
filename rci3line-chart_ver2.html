@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ローソク足 + RCIチャート</title>
+  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #candle-chart, #rci-chart {
+      width: 100%;
+      height: 300px;
+    }
+    h2 {
+      padding: 0.7rem;
+      background-color: #ddd;
+      margin: 0;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>USD/JPY ローソク足チャート</h2>
+<div id="candle-chart"></div>
+<h2>RCI 9・26・52</h2>
+<div id="rci-chart"></div>
+
+<script>
+  const API_KEY = '◯◯◯◯◯'; // ←忘れずに差し替えてください
+  const SYMBOL = 'USD/JPY';
+  const INTERVAL = '1day';
+
+  async function fetchCandleData() {
+    const url = `https://api.twelvedata.com/time_series?symbol=${SYMBOL}&interval=${INTERVAL}&outputsize=300&apikey=${API_KEY}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (!json.values) {
+      alert("エラー: " + JSON.stringify(json));
+      return { candles: [], closes: [] };
+    }
+
+    const sorted = json.values.reverse(); // 古い順
+
+    const candles = sorted.map(d => ({
+      time: Math.floor(new Date(d.datetime).getTime() / 1000),
+      open: parseFloat(d.open),
+      high: parseFloat(d.high),
+      low: parseFloat(d.low),
+      close: parseFloat(d.close)
+    }));
+
+    const closes = candles.map(d => ({ time: d.time, value: d.close }));
+
+    return { candles, closes };
+  }
+
+  function calculateRCI(data, period) {
+    const rci = [];
+
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) {
+        rci.push({ time: data[i].time, value: null });
+        continue;
+      }
+
+      const slice = data.slice(i - period + 1, i + 1);
+      const timeRanks = Array.from({ length: period }, (_, i) => i + 1);
+      const priceRanks = [...slice]
+        .map((d, idx) => ({ idx, value: d.value }))
+        .sort((a, b) => b.value - a.value)
+        .map((d, i) => ({ ...d, rank: i + 1 }))
+        .sort((a, b) => a.idx - b.idx)
+        .map(d => d.rank);
+
+      let sumD2 = 0;
+      for (let j = 0; j < period; j++) {
+        const d = timeRanks[j] - priceRanks[j];
+        sumD2 += d * d;
+      }
+
+      const rciValue = (1 - (6 * sumD2) / (period * (period * period - 1))) * 100;
+      rci.push({ time: data[i].time, value: rciValue });
+    }
+
+    return rci;
+  }
+
+  async function drawCharts() {
+    const { candles, closes } = await fetchCandleData();
+
+    if (candles.length === 0) return;
+
+    // --- ローソク足チャート ---
+    const candleChart = LightweightCharts.createChart(document.getElementById('candle-chart'), { height: 300 });
+    candleChart.addCandlestickSeries().setData(candles);
+
+    // --- RCI計算と描画 ---
+    const rci9 = calculateRCI(closes, 9);
+    const rci26 = calculateRCI(closes, 26);
+    const rci52 = calculateRCI(closes, 52);
+
+    const rciChart = LightweightCharts.createChart(document.getElementById('rci-chart'), { height: 300 });
+
+    rciChart.addLineSeries({ color: 'red', title: 'RCI9', lineWidth: 2 }).setData(rci9);
+    rciChart.addLineSeries({ color: 'green', title: 'RCI26', lineWidth: 2 }).setData(rci26);
+    rciChart.addLineSeries({ color: 'blue', title: 'RCI52', lineWidth: 2 }).setData(rci52);
+  }
+
+  drawCharts();
+</script>
+
+</body>
+</html>
