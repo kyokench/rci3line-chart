@@ -1,7 +1,28 @@
 [
-  { "label": "USD/JPY", "value": "USD/JPY" },
-  { "label": "EUR/USD", "value": "EUR/USD" },
-  { "label": "GBP/JPY", "value": "GBP/JPY" },
-  { "label": "AUD/JPY", "value": "AUD/JPY" },
-  { "label": "BTC/USD", "value": "BTC/USD" }
+  { "label": "USD/JPY（ドル円）",      "value": "USD/JPY" },
+  { "label": "EUR/USD（ユーロドル）",  "value": "EUR/USD" },
+  { "label": "GBP/USD（ポンドドル）",  "value": "GBP/USD" },
+  { "label": "AUD/USD（豪ドル米ドル）", "value": "AUD/USD" },
+  { "label": "EUR/JPY（ユーロ円）",    "value": "EUR/JPY" },
+  { "label": "GBP/JPY（ポンド円）",    "value": "GBP/JPY" },
+  { "label": "AUD/JPY（豪ドル円）",    "value": "AUD/JPY" },
+  { "label": "CAD/JPY（カナダドル円）", "value": "CAD/JPY" },
+  { "label": "CHF/JPY（スイスフラン円）", "value": "CHF/JPY" },
+
+  { "label": "S&P 500指数",     "value": "SPX" },
+  { "label": "NASDAQ 100指数",  "value": "NDX" },
+  { "label": "ダウ平均株価",     "value": "DJI" },
+
+  { "label": "日経225（日本）",  "value": "NIKKEI225" },
+  { "label": "TOPIX（日本）",    "value": "TOPIX" },
+
+  { "label": "DAX指数（ドイツ）", "value": "DAX" },
+  { "label": "CAC 40（フランス）", "value": "CAC" },
+  { "label": "FTSE 100（イギリス）", "value": "UKX" },
+
+  { "label": "香港ハンセン指数", "value": "HSI" },
+  { "label": "上海総合指数",     "value": "SSE" },
+
+  { "label": "WTI原油先物",      "value": "CL" },
+  { "label": "金先物（GOLD）",   "value": "XAU/USD" }
 ]
