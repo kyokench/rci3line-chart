@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>通貨ペア切替チャート（JSON読み込み）</title>
+  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #candle-chart, #rci-chart { width: 100%; height: 300px; }
+    h2 { padding: 0.5rem; margin: 0; background: #eee; }
+    #selector { padding: 10px; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+<h2>通貨ペアを選択：</h2>
+<select id="selector"></select>
+
+<h2>ローソク足チャート</h2>
+<div id="candle-chart"></div>
+<h2>RCI（9・26・52）</h2>
+<div id="rci-chart"></div>
+
+<script>
+  const API_KEY = '◯◯◯◯◯';
+  const INTERVAL = '1day';
+  const OUTPUT_SIZE = 300;
+
+  let candleChart, candleSeries, rciChart, rciSeries = [];
+
+  function createCharts() {
+    if (candleChart) candleChart.remove();
+    if (rciChart) rciChart.remove();
+
+    // ローソク足チャートの作成
+    candleChart = LightweightCharts.createChart(document.getElementById('candle-chart'), {
+      height: 300,
+      grid: {
+        vertLines: {
+          visible: false  // ✅ 縦線非表示
+        },
+        horzLines: {
+          visible: true
+        }
+      }
+    });
+    candleSeries = candleChart.addCandlestickSeries();
+
+    rciChart = LightweightCharts.createChart(document.getElementById('rci-chart'), {
+      height: 300,
+      rightPriceScale: {
+        autoScale: false
+      },
+      grid: {
+        vertLines: {
+          visible: false  // ✅ RCIチャートの縦線を非表示に
+        },
+        horzLines: {
+          visible: true
+        }
+      }
+    });
+
+    rciSeries = [
+      rciChart.addLineSeries({ color: 'black', title: 'RCI9' }),
+      rciChart.addLineSeries({ color: 'blue', title: 'RCI26' }),
+      rciChart.addLineSeries({ color: 'green', title: 'RCI52' })
+    ];
+
+    // ✅ チャート右側に空白を追加（20本分）
+    candleChart.timeScale().applyOptions({ rightOffset: 20 });
+    rciChart.timeScale().applyOptions({ rightOffset: 20 });
+
+    // ✅ RCIガイドライン（±80, ±20）
+    const guideLevels = [80, 20, -20, -80];
+    const now = Math.floor(Date.now() / 1000);
+    guideLevels.forEach(level => {
+      rciChart.addLineSeries({
+        color: '#888',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted
+      }).setData([
+        { time: now - 100000000, value: level },
+        { time: now + 100000000, value: level }
+      ]);
+    });
+  }
+
+
+  async function fetchCandleData(symbol) {
+    const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${INTERVAL}&outputsize=${OUTPUT_SIZE}&apikey=${API_KEY}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (!json.values) {
+      alert("エラー：" + JSON.stringify(json));
+      return { candles: [], closes: [] };
+    }
+
+    const sorted = json.values.reverse();
+
+    const candles = sorted.map(d => ({
+      time: Math.floor(new Date(d.datetime).getTime() / 1000),
+      open: parseFloat(d.open),
+      high: parseFloat(d.high),
+      low: parseFloat(d.low),
+      close: parseFloat(d.close)
+    }));
+
+    const closes = candles.map(d => ({ time: d.time, value: d.close }));
+    return { candles, closes };
+  }
+
+  function calculateRCI(data, period) {
+      const result = [];
+
+      for (let i = period - 1; i < data.length; i++) {
+          let sum = 0;
+
+          for (let k = 0; k < period; k++) {
+              const indexI = i - k;
+              const rank = period - k;
+
+              let priceRank = 0;
+              for (let j = 0; j < period; j++) {
+                  const indexJ = i - j;
+                  if (data[indexI].value >= data[indexJ].value) {
+                      priceRank += 1;
+                  }
+              }
+
+              sum += Math.pow(rank - priceRank, 2);
+          }
+
+          const rci = 1 - (6 * sum) / (period * (Math.pow(period, 2) - 1));
+          result.push({
+              time: data[i].time,
+              value: rci * 100
+          });
+      }
+
+      return result;
+  }
+
+
+
+
+  async function updateChart(symbol) {
+    const { candles, closes } = await fetchCandleData(symbol);
+    if (!candles.length) return;
+
+    candleSeries.setData(candles);
+    rciSeries[0].setData(calculateRCI(closes, 9));
+    rciSeries[1].setData(calculateRCI(closes, 26));
+    rciSeries[2].setData(calculateRCI(closes, 52));
+  }
+
+  async function loadSymbolList() {
+    const res = await fetch("https://kyokench.github.io/rci3line-chart/symbols.json");
+    const list = await res.json();
+
+    const selector = document.getElementById("selector");
+    list.forEach(sym => {
+      const opt = document.createElement("option");
+      opt.value = sym.value;
+      opt.textContent = sym.label;
+      selector.appendChild(opt);
+    });
+
+    // 初期表示：1番上
+    createCharts();
+    updateChart(list[0].value);
+
+    selector.addEventListener("change", function () {
+      createCharts();
+      updateChart(this.value);
+    });
+  }
+
+  loadSymbolList();
+</script>
+
+</body>
+</html>
